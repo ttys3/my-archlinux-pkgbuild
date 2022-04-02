@@ -1,5 +1,5 @@
 diff --git a/auth-dialog/main.c b/auth-dialog/main.c
-index 459802a..10c951f 100644
+index 459802a..32f50f2 100644
 --- a/auth-dialog/main.c
 +++ b/auth-dialog/main.c
 @@ -103,6 +103,7 @@ typedef gboolean (*AskUserFunc) (const char *vpn_name,
@@ -69,36 +69,73 @@ index 459802a..10c951f 100644
  	gs_unref_hashtable GHashTable *data = NULL;
  	gs_unref_hashtable GHashTable *secrets = NULL;
  	gboolean need_password = FALSE;
-+    gboolean need_mf_code = FALSE;
++    gboolean need_mfa_code = FALSE;
  	gboolean need_certpass = FALSE;
  	gboolean need_proxypass = FALSE;
  	gs_strfreev char **hints = NULL;
-@@ -512,7 +527,7 @@ main (int argc, char *argv[])
+@@ -512,12 +527,13 @@ main (int argc, char *argv[])
  	/* Determine which passwords are actually required, either from hints or
  	 * from looking at the VPN configuration.
  	 */
 -	prompt = get_passwords_required (data, (const char *const*) hints, &need_password, &need_certpass, &need_proxypass);
-+	prompt = get_passwords_required (data, (const char *const*) hints, &need_password, &need_mf_code, &need_certpass, &need_proxypass);
++	prompt = get_passwords_required (data, (const char *const*) hints, &need_password, &need_mfa_code, &need_certpass, &need_proxypass);
  	if (!prompt)
  		prompt = g_strdup_printf (_("You need to authenticate to access the Virtual Private Network “%s”."), vpn_name);
  
-@@ -533,6 +548,8 @@ main (int argc, char *argv[])
+ 	/* Exit early if we don't need any passwords */
+-	if (!need_password && !need_certpass && !need_proxypass) {
++    // do not forget need_mfa_code, otherwise we will get error: "secrets: failed to request VPN secrets #4: No agents were available for this request"
++	if (!need_password && !need_mfa_code && !need_certpass && !need_proxypass) {
+ 		no_secrets_required_func ();
+ 		return EXIT_SUCCESS;
+ 	}
+@@ -533,6 +549,8 @@ main (int argc, char *argv[])
  	                        &existing_proxypass);
  	if (need_password && !existing_password)
  		ask_user = TRUE;
-+    else if (need_mf_code)
++    else if (need_mfa_code)
 +        ask_user = TRUE;
  	else if (need_certpass && !existing_certpass)
  		ask_user = TRUE;
  	else if (need_proxypass && !existing_proxypass)
-@@ -563,6 +580,7 @@ main (int argc, char *argv[])
+@@ -561,13 +579,14 @@ main (int argc, char *argv[])
+ 	}
+ 
  	finish_func (vpn_name,
- 	             prompt,
- 	             allow_interaction,
-+                 need_mf_code,
- 	             need_password,
+-	             prompt,
+-	             allow_interaction,
+-	             need_password,
++                 prompt,
++                 allow_interaction,
++                 need_mfa_code,
++                 need_password,
  	             new_password ? new_password : existing_password,
- 	             need_certpass,
+-	             need_certpass,
++                 need_certpass,
+ 	             new_certpass ? new_certpass : existing_certpass,
+-	             need_proxypass,
++                 need_proxypass,
+ 	             new_proxypass ? new_proxypass : existing_proxypass);
+ 	return EXIT_SUCCESS;
+ }
+diff --git a/properties/import-export.c b/properties/import-export.c
+index 51049de..ae91796 100644
+--- a/properties/import-export.c
++++ b/properties/import-export.c
+@@ -1747,6 +1747,13 @@ handle_line_error:
+ 		                             NM_SETTING_SECRET_FLAG_AGENT_OWNED,
+ 		                             NULL);
+ 	}
++
++    /* ttys3: Default secret flags for mfa code */
++    nm_setting_set_secret_flags (NM_SETTING (s_vpn),
++                                 NM_OPENVPN_KEY_MFA_TOKEN,
++                                 NM_SETTING_SECRET_FLAG_NOT_SAVED,
++                                 NULL);
++
+ 	if (have_key || have_pkcs12) {
+ 		gs_free char *key_path_free = NULL;
+ 
 diff --git a/shared/nm-service-defines.h b/shared/nm-service-defines.h
 index 44a83f6..a213a86 100644
 --- a/shared/nm-service-defines.h
@@ -125,7 +162,7 @@ index 2880c46..7cfb30e 100644
  
  #define _LOGD(...) _NMLOG(LOG_INFO,    __VA_ARGS__)
 diff --git a/src/nm-openvpn-service.c b/src/nm-openvpn-service.c
-index af57227..95d1a3a 100644
+index af57227..ff8fa43 100644
 --- a/src/nm-openvpn-service.c
 +++ b/src/nm-openvpn-service.c
 @@ -104,6 +104,7 @@ typedef struct {
@@ -194,7 +231,7 @@ index af57227..95d1a3a 100644
  			gs_free char *response = NULL;
  
  			response = g_strdup_printf ("CRV1::%s::%s",
-@@ -928,21 +964,49 @@ handle_auth (NMOpenvpnPluginIOData *io_data,
+@@ -928,21 +964,45 @@ handle_auth (NMOpenvpnPluginIOData *io_data,
  			                 response);
  			nm_clear_g_free (&io_data->challenge_state_id);
  			nm_clear_g_free (&io_data->challenge_text);
@@ -204,6 +241,7 @@ index af57227..95d1a3a 100644
 -			                 username,
 -			                 io_data->password);
 -		} else {
+-			hints = g_new0 (const char *, 3);
 +		} else if (username != NULL && passwd != NULL && token != NULL) {
 +            char *passwd_dup = g_strdup(passwd);
 +            char *token_dup = g_strdup(token);
@@ -228,7 +266,7 @@ index af57227..95d1a3a 100644
 +                g_free(token_dup);
 +            }
 +        } else {
- 			hints = g_new0 (const char *, 3);
++			hints = g_new0 (const char *, 4);
  			if (!username) {
  				hints[i++] = NM_OPENVPN_KEY_USERNAME;
  				*out_message = _("A username is required.");
@@ -236,21 +274,17 @@ index af57227..95d1a3a 100644
  			if (!io_data->password) {
 +				_LOGD("xxoo: add password hint");
  				hints[i++] = NM_OPENVPN_KEY_PASSWORD;
-+				hints[i++] = NM_OPENVPN_KEY_MFA_TOKEN;
  				*out_message = _("A password is required.");
  			}
 +            if (!token) {
 +				_LOGD("xxoo: add mfa-token hint");
-+				// force password hint to avoid error:
-+				// secrets: failed to request VPN secrets #4: No agents were available for this request
-+				hints[i++] = NM_OPENVPN_KEY_PASSWORD;
 +                hints[i++] = NM_OPENVPN_KEY_MFA_TOKEN;
-+                *out_message = _("A 2FA code is required.");
++                *out_message = _("A MFA code is required.");
 +            }
  			if (!username && !io_data->password)
  				*out_message = _("A username and password are required.");
  			if (io_data->challenge_text)
-@@ -1045,9 +1109,10 @@ handle_management_socket (NMOpenvpnPlugin *plugin,
+@@ -1045,9 +1105,10 @@ handle_management_socket (NMOpenvpnPlugin *plugin,
  		if (handle_auth (priv->io_data, auth, &message, &hints)) {
  			/* Request new secrets if we need any */
  			if (message) {
@@ -264,7 +298,20 @@ index af57227..95d1a3a 100644
  					/* Interactive not allowed, can't ask for more secrets */
  					_LOGW ("More secrets required but cannot ask interactively");
  					*out_failure = NM_VPN_PLUGIN_FAILURE_LOGIN_FAILED;
-@@ -1234,6 +1299,17 @@ update_io_data_from_vpn_setting (NMOpenvpnPluginIOData *io_data,
+@@ -1084,6 +1145,12 @@ handle_management_socket (NMOpenvpnPlugin *plugin,
+ 				if (priv->io_data->password)
+ 					memset (priv->io_data->password, 0, strlen (priv->io_data->password));
+ 				g_clear_pointer (&priv->io_data->password, g_free);
++
++                /* after auth failed, clear existing mfa code in interactive mode */
++                if (priv->io_data->mfa_code)
++                    memset (priv->io_data->mfa_code, 0, strlen (priv->io_data->mfa_code));
++                g_clear_pointer (&priv->io_data->mfa_code, g_free);
++
+ 				fail = FALSE;
+ 			}
+ 		} else if (nm_streq (auth, "Private Key"))
+@@ -1234,6 +1301,18 @@ update_io_data_from_vpn_setting (NMOpenvpnPluginIOData *io_data,
  	}
  	io_data->password = g_strdup (nm_setting_vpn_get_secret (s_vpn, NM_OPENVPN_KEY_PASSWORD));
  
@@ -273,16 +320,32 @@ index af57227..95d1a3a 100644
 +		if (io_data->mfa_code) {
 +			memset (io_data->mfa_code, 0, strlen (io_data->mfa_code));
 +			g_free (io_data->mfa_code);
++            _LOGD ("update_io_data_from_vpn_setting: clear exists io_data->mfa_code");
 +    	}
 +    	io_data->mfa_code = g_strdup (nm_setting_vpn_get_secret (s_vpn, NM_OPENVPN_KEY_MFA_TOKEN));
-+
-+	//    nm_setting_vpn_remove_secret(s_vpn, NM_OPENVPN_KEY_MFA_TOKEN);
++        _LOGD ("update_io_data_from_vpn_setting: get mfa code from secret, io_data->mfa_code=%s", io_data->mfa_code);
++	    nm_setting_vpn_remove_secret(s_vpn, NM_OPENVPN_KEY_MFA_TOKEN);
 +	}
 +
  	if (io_data->priv_key_pass) {
  		memset (io_data->priv_key_pass, 0, strlen (io_data->priv_key_pass));
  		g_free (io_data->priv_key_pass);
-@@ -2378,6 +2454,10 @@ main (int argc, char *argv[])
+@@ -2022,8 +2101,14 @@ nm_openvpn_start_openvpn_binary (NMOpenvpnPlugin *plugin,
+ 	    || nm_setting_vpn_get_data_item (s_vpn, NM_OPENVPN_KEY_HTTP_PROXY_USERNAME)) {
+ 
+ 		priv->io_data = g_malloc0 (sizeof (NMOpenvpnPluginIOData));
++
++        // tricks: clear mfa token on first run (we are starting openvpn, so it is absolute first time)
++        _LOGD ("xxoo: clear mfa token on first run");
++        nm_setting_vpn_remove_secret(s_vpn, NM_OPENVPN_KEY_MFA_TOKEN);
++
+ 		update_io_data_from_vpn_setting (priv->io_data, s_vpn,
+ 		                                 nm_setting_vpn_get_user_name (s_vpn));
++
+ 		nm_openvpn_schedule_connect_timer (plugin);
+ 	}
+ 
+@@ -2378,6 +2463,10 @@ main (int argc, char *argv[])
  
  	gl.log_level = _nm_utils_ascii_str_to_int64 (getenv ("NM_VPN_LOG_LEVEL"),
  	                                             10, 0, LOG_DEBUG, -1);
@@ -293,7 +356,7 @@ index af57227..95d1a3a 100644
  	if (gl.log_level >= 0) {
  		if (gl.log_level >= LOG_DEBUG)
  			gl.log_level_ovpn = 10;
-@@ -2394,6 +2474,9 @@ main (int argc, char *argv[])
+@@ -2394,6 +2483,9 @@ main (int argc, char *argv[])
  		gl.log_level_ovpn = -1;
  	}
  
