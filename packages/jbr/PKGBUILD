@@ -1,0 +1,24 @@
+# Maintainer: Aloxaf <aloxafx at gamil>
+# https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=jbr-linux-x64
+
+pkgname=jbr-linux-x64
+pkgver=17.0.3-b469.12
+pkgrel=1
+pkgdesc="JetBrainsRuntime"
+arch=('x86_64')
+url='https://github.com/JetBrains/JetBrainsRuntime'
+options=('!strip')
+license=('custom')
+source=(
+  "https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-17.0.3-linux-x64-b469.12.tar.gz"
+)
+sha256sums=(
+  'ca9c67390e763f0a17fdd13a1531424dcccc926c726ddfb84b25b4c39b48cb02'
+)
+install=jbr-linux-x64.install
+
+package() {
+  install -dm755 "${pkgdir}/opt"
+  cp -a "${srcdir}/jbr" "${pkgdir}/opt/"
+}
+
