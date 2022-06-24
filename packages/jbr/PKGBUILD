@@ -21,5 +21,6 @@ sha256sums=(
 package() {
   install -dm755 "${pkgdir}/opt"
   cp -a "${srcdir}/jbr_jcef-${pkgver}-x64-b${_pkgbuild}" "${pkgdir}/opt/"
+  mv "${pkgdir}/opt/jbr_jcef-${pkgver}-x64-b${_pkgbuild}" "${pkgdir}/opt/jbr"
 }
 
