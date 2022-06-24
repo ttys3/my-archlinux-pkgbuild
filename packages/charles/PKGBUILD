@@ -2,18 +2,17 @@
 # Contributor: Jiabao Lin <me at leolin dot cn>
 # Contributor: Jan-Erik Rediger <badboy at archlinux dot us>
 # Contributor: Alexander Baldeck <lex@tentriplenine.com>
-# https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=charles
 
 pkgname=charles
-pkgver=4.6.2
+pkgver=4.6.3
 pkgrel=1
 pkgdesc="Web debugging proxy application"
 arch=(any)
 url="http://www.charlesproxy.com"
 license=('custom' 'APACHE')
 depends=('java-runtime>=8' 'hicolor-icon-theme')
-source=(http://www.charlesproxy.com/assets/release/${pkgver}/charles-proxy-${pkgver}_amd64.tar.gz)
-md5sums=('e57e65bb75a66929db331d30016bb3ac')
+source=(http://www.charlesproxy.com/assets/release/${pkgver}/charles-proxy-${pkgver}b4_amd64.tar.gz)
+md5sums=('32c253135e3a1c277aa075eade18165d')
 
 build() {
   cd "$srcdir/$pkgname"
@@ -47,6 +46,8 @@ package() {
     ${pkgdir}/usr/share/applications/charles-proxy.desktop
 
   sed -i 's/Icon=\.\..\+/Icon=charles/' ${pkgdir}/usr/share/applications/charles-proxy.desktop
+  sed -i 's|Exec=charles|env JAVA_HOME=/opt/jbr charles|' ${pkgdir}/usr/share/applications/charles-proxy.desktop
+    
   #Stop ^- from appearing in home directory
   sed -i 's/\^-/\/dev\/null/' ${pkgdir}/usr/bin/charles
   #Use XDG_CONFIG_HOME and if unset use ~/.config/charles rather than ~/ for .charles.config
