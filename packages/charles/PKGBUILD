@@ -46,8 +46,8 @@ package() {
     ${pkgdir}/usr/share/applications/charles-proxy.desktop
 
   sed -i 's/Icon=\.\..\+/Icon=charles/' ${pkgdir}/usr/share/applications/charles-proxy.desktop
-  sed -i 's|Exec=charles|env JAVA_HOME=/opt/jbr charles|' ${pkgdir}/usr/share/applications/charles-proxy.desktop
-    
+  sed -i 's|Exec=charles|Exec=env JAVA_HOME=/opt/jbr charles|' ${pkgdir}/usr/share/applications/charles-proxy.desktop
+
   #Stop ^- from appearing in home directory
   sed -i 's/\^-/\/dev\/null/' ${pkgdir}/usr/bin/charles
   #Use XDG_CONFIG_HOME and if unset use ~/.config/charles rather than ~/ for .charles.config
