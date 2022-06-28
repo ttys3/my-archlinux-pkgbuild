@@ -1,0 +1,39 @@
+# Maintainer: Kaizhao Zhang <zhangkaizhao@gmail.com>
+# https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=netease-cloud-music-gtk-bin
+
+_pkgname=netease-cloud-music-gtk4
+
+pkgname=netease-cloud-music-gtk-bin
+pkgver=2.0.0
+pkgrel=2
+pkgdesc="Linux 平台下基于 Rust + GTK 开发的网易云音乐播放器"
+arch=('x86_64')
+url="https://github.com/gmg137/netease-cloud-music-gtk"
+license=('GPL')
+depends=('gstreamer' 'gtk3' 'gst-plugins-bad' 'gst-plugins-base' 'gst-plugins-good' 'gst-plugins-ugly' 'gst-libav' 'openssl')
+optdepends=(
+  'osdlyrics: Show lyrics'
+)
+conflicts=('netease-cloud-music-gtk')
+source=(
+  "https://github.com/gmg137/netease-cloud-music-gtk/releases/download/2.0.0/${_pkgname}-${pkgver}-6.1.x86_64.rpm"
+  "README-${pkgver}.md::${url}/raw/${pkgver}/README.md"
+  "LICENSE-${pkgver}::${url}/raw/${pkgver}/COPYING"
+)
+noextract=(
+  "${_pkgname}-${pkgver}-6.1.x86_64.rpm"
+)
+sha256sums=(
+  'c25a08962be416eb97e5f7e2da153e0827770f954bf91bd6278e63b7e9a85da9'
+  'c9b60b78cebbc05945f226b5e58b2f6586bf532d836233a8bbc3e17fac90db4a'
+  '0ae0485a5bd37a63e63603596417e4eb0e653334fa6c7f932ca3a0e85d4af227'
+)
+
+package() {
+  cd "${srcdir}"
+  bsdtar -xf "${_pkgname}-${pkgver}-6.1.x86_64.rpm" -C "${pkgdir}/"
+  install -D -m644 "README-${pkgver}.md" "${pkgdir}/usr/share/doc/${_pkgname}/README.md"
+  install -D -m644 "LICENSE-${pkgver}" "${pkgdir}/usr/share/licenses/${_pkgname}/LICENSE"
+  install -d "${pkgdir}/usr/share/icons/hicolor/scalable/apps"
+  ln -s /usr/share/pixmaps/netease-cloud-music-gtk.svg "${pkgdir}/usr/share/icons/hicolor/scalable/apps/netease-cloud-music-gtk.svg"
+}
