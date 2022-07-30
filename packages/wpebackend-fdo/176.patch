@@ -1,0 +1,63 @@
+From 3318283ffe62a536cfbff307c77505d848d7098f Mon Sep 17 00:00:00 2001
+From: Jordy Vieira <jordyvieira@hotmail.com>
+Date: Sat, 9 Jul 2022 17:17:14 -0300
+Subject: [PATCH 1/2] Fix SIGSEGV
+
+---
+ src/view-backend-exportable-fdo-egl.cpp | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/src/view-backend-exportable-fdo-egl.cpp b/src/view-backend-exportable-fdo-egl.cpp
+index 09bb2bf..1a73269 100644
+--- a/src/view-backend-exportable-fdo-egl.cpp
++++ b/src/view-backend-exportable-fdo-egl.cpp
+@@ -267,9 +267,11 @@ class ClientBundleEGL final : public ClientBundle {
+ private:
+     struct wpe_fdo_egl_exported_image* findImage(struct wl_resource* bufferResource)
+     {
+-        if (auto* listener = wl_resource_get_destroy_listener(bufferResource, bufferDestroyListenerCallback)) {
+-            struct wpe_fdo_egl_exported_image* image;
+-            return wl_container_of(listener, image, bufferDestroyListener);
++        if (bufferResource) {
++            if (auto* listener = wl_resource_get_destroy_listener(bufferResource, bufferDestroyListenerCallback)) {
++                struct wpe_fdo_egl_exported_image* image;
++                return wl_container_of(listener, image, bufferDestroyListener);
++            }
+         }
+ 
+         return nullptr;
+
+From fcf330cc3036808b6fb83ee7a6cef4f5ff9e00c8 Mon Sep 17 00:00:00 2001
+From: Jordy Vieira <jordyvieira@hotmail.com>
+Date: Sat, 9 Jul 2022 19:16:03 -0300
+Subject: [PATCH 2/2] Only delete images in releaseImage
+
+Deleting images in bufferDestroyListenerCallback is incorrect, and
+caused a double free.
+---
+ src/view-backend-exportable-fdo-egl.cpp | 5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/src/view-backend-exportable-fdo-egl.cpp b/src/view-backend-exportable-fdo-egl.cpp
+index 1a73269..0031222 100644
+--- a/src/view-backend-exportable-fdo-egl.cpp
++++ b/src/view-backend-exportable-fdo-egl.cpp
+@@ -247,8 +247,6 @@ class ClientBundleEGL final : public ClientBundle {
+ 
+     void releaseImage(struct wpe_fdo_egl_exported_image* image)
+     {
+-        image->exported = false;
+-
+         if (image->bufferResource)
+             viewBackend->releaseBuffer(image->bufferResource);
+         else
+@@ -297,9 +295,6 @@ class ClientBundleEGL final : public ClientBundle {
+         image = wl_container_of(listener, image, bufferDestroyListener);
+ 
+         image->bufferResource = nullptr;
+-
+-        if (!image->exported)
+-            deleteImage(image);
+     }
+ };
+ 
