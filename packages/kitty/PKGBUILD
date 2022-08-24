@@ -18,7 +18,7 @@ source=("${pkgname}-${pkgver}.tar.xz::https://github.com/kovidgoyal/kitty/archiv
 sha512sums=('SKIP')
 
 build() {
-  cd "$srcdir/$pkgname-$pkgver"
+  cd "$srcdir/$pkgname-master"
   python3 setup.py linux-package --update-check-interval=0
 }
 
@@ -28,7 +28,7 @@ package_kitty() {
               'python-pygments: syntax highlighting in kitty +kitten diff'
               'libcanberra: playing "bell" sound on terminal bell')
 
-  cd "$srcdir/$pkgname-$pkgver"
+  cd "$srcdir/$pkgname-master"
 
   cp -r linux-package "${pkgdir}"/usr
 
@@ -42,7 +42,7 @@ package_kitty() {
   rm -r "$pkgdir"/usr/share/terminfo
   rm -r "$pkgdir"/usr/lib/kitty/shell-integration
 
-  install -Dm644 docs/_build/html/_downloads/*/kitty.conf "${pkgdir}"/usr/share/doc/${pkgname}/kitty.conf
+  install -Dm644 docs/generated/conf/kitty.conf "${pkgdir}"/usr/share/doc/${pkgname}/kitty.conf
 }
 
 package_kitty-terminfo() {
@@ -50,12 +50,12 @@ package_kitty-terminfo() {
   depends=('ncurses')
 
   mkdir -p "$pkgdir/usr/share/terminfo"
-  tic -x -o "$pkgdir/usr/share/terminfo" $pkgbase-$pkgver/terminfo/kitty.terminfo
+  tic -x -o "$pkgdir/usr/share/terminfo" $pkgbase-master/terminfo/kitty.terminfo
 }
 
 package_kitty-shell-integration() {
   pkgdesc='Shell integration scripts for kitty, an OpenGL-based terminal emulator'
 
   mkdir -p "$pkgdir/usr/lib/kitty/"
-  cp -r "$srcdir/$pkgbase-$pkgver/shell-integration" "$pkgdir/usr/lib/kitty/"
+  cp -r "$srcdir/$pkgbase-master/shell-integration" "$pkgdir/usr/lib/kitty/"
 }
